@@ -8,6 +8,8 @@
 
 const int WINDOW_WIDTH = 120;
 const int WINDOW_HEIGHT = 40;
+const int FIRST_LINE = WINDOW_WIDTH/3;
+const int SECOND_LINE = FIRST_LINE*2;
 const int WINDOW_X = 0;
 const int WINDOW_Y = 0;
 
@@ -19,7 +21,8 @@ void moveSymbol(WINDOW* win, char symbol, int startX, int startY) {
     int dx = 1;
     int dy = 1;
     int bounces = 0;
-
+    int speed = 50000;
+    
     while (true) {
         {
             std::lock_guard<std::mutex> lock(windowMutex); // Lock the window
@@ -27,7 +30,25 @@ void moveSymbol(WINDOW* win, char symbol, int startX, int startY) {
             wrefresh(win);
         } // Release the lock
 
-        usleep(50000); // sleep for 0.05 second
+        if(x == FIRST_LINE){
+            if(dx == 1){
+                //A -> B +30%
+                speed *= 0.7;
+            }else{
+                //B -> A -40%
+                speed *= 1.4;
+            }
+        }else if(x == SECOND_LINE){
+            if(dx == 1){
+                //B -> C -10%
+                speed *= 1.1;
+            }else{
+                //C -> B +20%
+                speed *= 0.8;
+            }
+        }
+
+        usleep(speed); // sleep for 0.05 second
 
         {
             std::lock_guard<std::mutex> lock(windowMutex); // Lock the window
