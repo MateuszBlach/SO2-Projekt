@@ -112,6 +112,9 @@ int main(int argc, char ** argv){
     top = bottom = (int)'-';
     tlc = trc = blc = brc = (int)'+';
     wborder(win,left,right,top,bottom,tlc,trc,blc,brc);
+
+
+    mvprintw(WINDOW_HEIGHT, WINDOW_X, "|-------------------A-------------------|-------------------B-------------------|-------------------C-------------------|");
     refresh();
     wrefresh(win);
 
