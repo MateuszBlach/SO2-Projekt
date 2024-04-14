@@ -18,6 +18,7 @@ void moveSymbol(WINDOW* win, char symbol, int startX, int startY) {
     int y = startY;
     int dx = 1;
     int dy = 1;
+    int bounces = 0;
 
     while (true) {
         {
@@ -40,18 +41,26 @@ void moveSymbol(WINDOW* win, char symbol, int startX, int startY) {
         // Check for collision with window boundaries
         if (x >= WINDOW_WIDTH - 2 || x <= 1) {
             dx = -dx; // Change direction on collision
+            bounces++;
         }
         if (y >= WINDOW_HEIGHT - 2 || y <= 1) {
             dy = -dy; // Change direction on collision
+            bounces++;
+        }
+
+        // Check if the symbol has bounced 6 times
+        if (bounces >= 6) {
+            break; // Exit the loop if 6 bounces reached
         }
     }
 }
 
+
 void spawnSymbol(WINDOW* win) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> disX(1, WINDOW_WIDTH - 2);
-    std::uniform_int_distribution<int> disY(1, WINDOW_HEIGHT - 2);
+    std::uniform_int_distribution<int> disX(1, WINDOW_WIDTH - 3);
+    std::uniform_int_distribution<int> disY(1, WINDOW_HEIGHT - 3);
     std::uniform_int_distribution<int> disSymbol('a', 'z');
 
     while (true) {
@@ -62,7 +71,7 @@ void spawnSymbol(WINDOW* win) {
         std::thread symbolThread(moveSymbol, win, symbol, x, y);
         symbolThread.detach(); // Detach the thread to allow it to run independently
         
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 
