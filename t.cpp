@@ -25,10 +25,11 @@ void moveSymbol(WINDOW* win, char symbol, int startX, int startY) {
     
     while (true) {
         {
-            std::lock_guard<std::mutex> lock(windowMutex); // Lock the window
+            //Użycie mutexa w celi ochrony wspólnych zasobów
+            std::lock_guard<std::mutex> lock(windowMutex);
             mvwaddch(win, y, x, symbol);
             wrefresh(win);
-        } // Release the lock
+        } 
 
         if(x == FIRST_LINE){
             if(dx == 1){
@@ -90,7 +91,7 @@ void spawnSymbol(WINDOW* win) {
         int y = disY(gen);
         
         std::thread symbolThread(moveSymbol, win, symbol, x, y);
-        symbolThread.detach(); // Detach the thread to allow it to run independently
+        symbolThread.detach();
         
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
@@ -112,16 +113,11 @@ int main(int argc, char ** argv){
     top = bottom = (int)'-';
     tlc = trc = blc = brc = (int)'+';
     wborder(win,left,right,top,bottom,tlc,trc,blc,brc);
-
-
     mvprintw(WINDOW_HEIGHT, WINDOW_X, "|-------------------A-------------------|-------------------B-------------------|-------------------C-------------------|");
     refresh();
     wrefresh(win);
 
-    // Collection of symbol threads
-    std::vector<std::thread> symbolThreads;
-
-    // Spawning symbols in a separate thread
+    //Wątek odpowiedzialny za tworzenie nowych symboli na ekranie
     std::thread spawnThread(spawnSymbol, win);
 
     getch();
