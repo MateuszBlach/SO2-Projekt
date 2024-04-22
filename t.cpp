@@ -7,6 +7,8 @@
 #include <vector>
 #include <atomic>
 
+using namespace std;
+
 const int WINDOW_WIDTH = 120;
 const int WINDOW_HEIGHT = 40;
 const int FIRST_LINE = WINDOW_WIDTH / 3;
@@ -14,8 +16,9 @@ const int SECOND_LINE = FIRST_LINE * 2;
 const int WINDOW_X = 0;
 const int WINDOW_Y = 0;
 
-std::mutex windowMutex;
-std::atomic<bool> stopThreads(false);
+mutex windowMutex;
+atomic<bool> stopThreads(false);
+vector<thread> symbolThreads;
 
 void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
     int x = startX;
@@ -27,7 +30,7 @@ void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
 
     while (!stopThreads) {
         {
-            std::lock_guard<std::mutex> lock(windowMutex);
+            lock_guard<mutex> lock(windowMutex);
             mvwaddch(win, y, x, symbol);
             wrefresh(win);
         }
@@ -46,49 +49,46 @@ void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
             }
         }
 
-        usleep(speed); // sleep for 0.05 second
+        usleep(speed);
 
         {
-            std::lock_guard<std::mutex> lock(windowMutex);
+            lock_guard<mutex> lock(windowMutex);
             mvwaddch(win, y, x, ' ');
         }
 
-        // Move the symbol
         x += dx;
         y += dy;
 
-        // Check for collision with window boundaries
         if (x >= WINDOW_WIDTH - 2 || x <= 1) {
-            dx = -dx; // Change direction on collision
+            dx = -dx; 
             bounces++;
         }
         if (y >= WINDOW_HEIGHT - 2 || y <= 1) {
-            dy = -dy; // Change direction on collision
+            dy = -dy; 
             bounces++;
         }
 
-        // Check if the symbol has bounced 6 times
         if (bounces >= 6) {
-            break; // Exit the loop if 6 bounces reached
+            break; 
         }
     }
 }
 
 void spawnSymbol(WINDOW *win) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> disX(1, WINDOW_WIDTH - 3);
-    std::uniform_int_distribution<int> disY(1, WINDOW_HEIGHT - 3);
-    std::uniform_int_distribution<int> disSymbol('a', 'z');
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution<int> disX(1, WINDOW_WIDTH - 3);
+    uniform_int_distribution<int> disY(1, WINDOW_HEIGHT - 3);
+    uniform_int_distribution<int> disSymbol('a', 'z');
 
     while (!stopThreads) {
         char symbol = static_cast<char>(disSymbol(gen));
         int x = disX(gen);
         int y = disY(gen);
 
-        std::thread symbolThread(moveSymbol, win, symbol, x, y);
-        symbolThread.detach();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        thread symbolThread(moveSymbol, win, symbol, x, y);
+        symbolThreads.push_back(move(symbolThread)); 
+        this_thread::sleep_for(chrono::seconds(1));
     }
 }
 
@@ -107,7 +107,6 @@ int main(int argc, char **argv) {
     noecho();
 
     WINDOW *win = newwin(WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_Y, WINDOW_X);
-
     int left, right, top, bottom, tlc, trc, blc, brc;
     left = right = (int)'|';
     top = bottom = (int)'-';
@@ -117,19 +116,25 @@ int main(int argc, char **argv) {
     refresh();
     wrefresh(win);
 
-    // Spawning symbols in a separate thread
-    std::thread spawnThread(spawnSymbol, win);
+    //Wątek odpowiedzialny za tworzenie nowych symboli
+    thread spawnThread(spawnSymbol, win);
 
-    // Keyboard handler thread
-    std::thread keyboardThread(keyboardHandler);
+     //Wątek odpowiedzialny za obsługę klawiatury
+    thread keyboardThread(keyboardHandler);
 
-    // Join all threads before exiting
+    //Zakończenie wszystkich wątków przed zakończeniem programu
     if (spawnThread.joinable()) {
         spawnThread.join();
     }
 
     if (keyboardThread.joinable()) {
         keyboardThread.join();
+    }
+
+    for (auto& thread : symbolThreads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
     }
 
     endwin();
