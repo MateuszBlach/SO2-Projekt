@@ -87,6 +87,10 @@ void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
         }
 
         if (bounces >= 6) {
+            if(x >= FIRST_LINE && x <= SECOND_LINE){
+                countB--;
+                countBCond.notify_one();
+            }
             break;
         }
     }
