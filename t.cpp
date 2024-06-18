@@ -8,6 +8,8 @@
 #include <atomic>
 #include <condition_variable>
 #include <string>
+#include <queue>
+#include <climits> // for INT_MAX
 
 using namespace std;
 
@@ -18,13 +20,16 @@ const int SECOND_LINE = FIRST_LINE * 2;
 const int WINDOW_X = 0;
 const int WINDOW_Y = 0;
 
-int countB = 0;
-
 mutex windowMutex;
-mutex countBMutex;
-condition_variable countBCond;
 atomic<bool> stopThreads(false);
 vector<thread> symbolThreads;
+
+int countB = 0;
+mutex countBMutex;
+condition_variable countBCond;
+
+// Priorytetowa kolejka do przechowywania symboli czekających na wejście do strefy B
+priority_queue<pair<int, thread::id>> waitingQueue;
 
 void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
     int x = startX;
@@ -46,21 +51,25 @@ void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
 
             if (x == FIRST_LINE) {
                 if (dx == 1) { // A -> B
-                    countBCond.wait(lock, []{ return countB < 2; });
+                    waitingQueue.push(make_pair(-speed, this_thread::get_id())); // Dodaj do kolejki priorytetowej
+                    countBCond.wait(lock, [&, id=this_thread::get_id()]{ return countB < 2 && waitingQueue.top().second == id; });
+                    waitingQueue.pop();
                     countB++;
                     speed *= 0.7; // Zwiększenie prędkości o 30%
                 } else { // B -> A
                     speed *= 1.4; // Zmniejszenie prędkości o 40%
                     countB--;
-                    countBCond.notify_one();
+                    countBCond.notify_all();
                 }
             } else if (x == SECOND_LINE) {
                 if (dx == 1) { // B -> C
                     speed *= 1.1; // Zwiększenie prędkości o 10%
                     countB--;
-                    countBCond.notify_one();
+                    countBCond.notify_all();
                 } else { // C -> B
-                    countBCond.wait(lock, []{ return countB < 2; });
+                    waitingQueue.push(make_pair(-speed, this_thread::get_id())); // Dodaj do kolejki priorytetowej
+                    countBCond.wait(lock, [&, id=this_thread::get_id()]{ return countB < 2 && waitingQueue.top().second == id; });
+                    waitingQueue.pop();
                     countB++;
                     speed *= 0.8; // Zwiększenie prędkości o 20%
                 }
@@ -87,9 +96,10 @@ void moveSymbol(WINDOW *win, char symbol, int startX, int startY) {
         }
 
         if (bounces >= 6) {
-            if(x >= FIRST_LINE && x <= SECOND_LINE){
+            if (x >= FIRST_LINE && x <= SECOND_LINE) {
+                unique_lock<mutex> lock(countBMutex);
                 countB--;
-                countBCond.notify_one();
+                countBCond.notify_all();
             }
             break;
         }
@@ -111,7 +121,9 @@ void spawnSymbol(WINDOW *win) {
         {
             unique_lock<mutex> lock(countBMutex);
             if (x >= FIRST_LINE && x <= SECOND_LINE) {
-                countBCond.wait(lock, []{ return countB < 2; });
+                waitingQueue.push(make_pair(INT_MAX, this_thread::get_id())); // Wstaw symbol z bardzo niskim priorytetem
+                countBCond.wait(lock, [&, id=this_thread::get_id()]{ return countB < 2 && waitingQueue.top().second == id; });
+                waitingQueue.pop();
                 countB++;
             }
         }
